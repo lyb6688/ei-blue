@@ -3,34 +3,35 @@ name: Build Android APK
 on:
   push:
     branches:
-      - main  # Trigger workflow on pushes to main branch
+      - main  # 触发条件：推送到 main 分支
   pull_request:
     branches:
-      - main  # Trigger workflow on pull requests targeting main branch
+      - main  # 触发条件：拉取请求目标为 main 分支
+  workflow_dispatch:  # 允许手动触发工作流
 
 jobs:
   build:
-    runs-on: ubuntu-latest  # Specify the environment to run the workflow
+    runs-on: ubuntu-latest  # 运行环境
 
     steps:
-      # Step 1: Checkout code from GitHub repository
+      # 步骤 1: 检出代码
       - name: Checkout code
         uses: actions/checkout@v2
 
-      # Step 2: Set up Flutter SDK
+      # 步骤 2: 设置 Flutter 环境
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '2.16.1'  # Ensure you're using a compatible Flutter version
+          flutter-version: '2.16.1'
 
-      # Step 3: Set up Java 8
+      # 步骤 3: 设置 Java 8 环境
       - name: Set up Java 8
         uses: actions/setup-java@v2
         with:
           java-version: '8'
           distribution: 'adoptopenjdk'
 
-      # Step 4: Set up Android SDK (necessary for building Android apps)
+      # 步骤 4: 设置 Android SDK 环境
       - name: Set up Android SDK
         uses: android-actions/setup-android@v2
         with:
@@ -38,15 +39,15 @@ jobs:
           target: android-30
           modules: 'platform-tools,build-tools;30.0.3'
 
-      # Step 5: Install Flutter dependencies
+      # 步骤 5: 安装 Flutter 依赖
       - name: Install dependencies
         run: flutter pub get
 
-      # Step 6: Build APK (release version)
+      # 步骤 6: 构建 APK
       - name: Build APK
         run: flutter build apk --release
 
-      # Step 7: Upload the APK as an artifact
+      # 步骤 7: 上传 APK 文件作为构建产物
       - name: Upload APK
         uses: actions/upload-artifact@v2
         with:
