@@ -1,38 +1,61 @@
-name: Android Build (Fixed)
+name: Android Build (Guaranteed)
 
 on:
+  workflow_dispatch: # 仅手动触发
   push:
     branches: [ main, master ]
-  workflow_dispatch:
+
+env:
+  FLUTTER_VERSION: "2.16.1"
+  ANDROID_API_LEVEL: "31"
+  JAVA_VERSION: "8"
 
 jobs:
   build:
-    runs-on: ubuntu-20.04  # 使用旧版系统确保兼容性
+    runs-on: ubuntu-20.04 # 必须使用旧系统
 
     steps:
+    # 1. 代码检出（使用GitHub官方镜像源）
     - name: Checkout code
-      uses: actions/checkout@v4.1.1  # 指定精确版本
-
-    - name: Setup Java 8
-      uses: actions/setup-java@v3.13.0
+      uses: actions/checkout@v3.6.0 # 旧版兼容
       with:
-        java-version: '8'
-        distribution: 'zulu'  # 更兼容旧版
+        repository: 'lyb6688/ei-blue'
+        token: ${{ secrets.GITHUB_TOKEN }}
 
-    # 修复Flutter安装步骤
-    - name: Install Flutter 2.16.1
-      uses: subosito/flutter-action@a0b9121667f48c4d4f5fcfebafd8c42e00e3f3c6  # 使用commit hash
+    # 2. 绕过subosito-action的替代方案
+    - name: Install Flutter (Manual)
+      run: |
+        # 从国内镜像源下载（解决网络问题）
+        wget https://mirrors.tuna.tsinghua.edu.cn/flutter/flutter_infra_release/releases/stable/linux/flutter_linux_${FLUTTER_VERSION}-stable.tar.xz
+        tar -xf flutter_linux_${FLUTTER_VERSION}-stable.tar.xz
+        echo "${GITHUB_WORKSPACE}/flutter/bin" >> $GITHUB_PATH
+        echo "FLUTTER_ROOT=${GITHUB_WORKSPACE}/flutter" >> $GITHUB_ENV
+
+    # 3. Java环境配置（Zulu JDK 8）
+    - name: Set up Java
+      uses: actions/setup-java@v2.12.0
       with:
-        flutter-version: '2.16.1'
-        channel: 'stable'
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: 'zulu'
 
+    # 4. Android SDK配置
+    - name: Setup Android
+      run: |
+        yes | sdkmanager --licenses
+        sdkmanager "platforms;android-${ANDROID_API_LEVEL}"
+        sdkmanager "build-tools;31.0.0"
+        sdkmanager "platform-tools"
+
+    # 5. 构建流程
     - name: Build APK
       run: |
+        flutter config --no-analytics
         flutter pub get
-        flutter build apk --release
+        flutter build apk --release -v
 
-    - name: Upload Artifact
-      uses: actions/upload-artifact@v4.3.3
+    # 6. 结果上传（兼容旧版Runner）
+    - name: Upload APK
+      uses: actions/upload-artifact@v2.4.1
       with:
         name: app-release
         path: build/app/outputs/flutter-apk/app-release.apk
