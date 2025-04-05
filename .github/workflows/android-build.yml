@@ -1,61 +1,59 @@
 name: Android Build (Guaranteed)
 
 on:
-  workflow_dispatch: # 仅手动触发
+  workflow_dispatch:
   push:
     branches: [ main, master ]
 
 env:
   FLUTTER_VERSION: "2.16.1"
-  ANDROID_API_LEVEL: "31"
   JAVA_VERSION: "8"
 
 jobs:
   build:
-    runs-on: ubuntu-20.04 # 必须使用旧系统
+    runs-on: ubuntu-20.04
 
     steps:
-    # 1. 代码检出（使用GitHub官方镜像源）
+    # 1. 使用验证通过的checkout版本
     - name: Checkout code
-      uses: actions/checkout@v3.6.0 # 旧版兼容
-      with:
-        repository: 'lyb6688/ei-blue'
-        token: ${{ secrets.GITHUB_TOKEN }}
+      uses: actions/checkout@v3.5.3  # 经测试兼容版本
 
-    # 2. 绕过subosito-action的替代方案
-    - name: Install Flutter (Manual)
+    # 2. 手动安装Zulu JDK 8（完全绕过setup-java）
+    - name: Install Java 8
       run: |
-        # 从国内镜像源下载（解决网络问题）
+        sudo apt-get update
+        sudo apt-get install -y wget
+        wget https://cdn.azul.com/zulu/bin/zulu8.70.0.23-ca-jdk8.0.372-linux_x64.tar.gz
+        sudo tar -xzf zulu8.70.0.23-ca-jdk8.0.372-linux_x64.tar.gz -C /usr/lib/jvm
+        echo "JAVA_HOME=/usr/lib/jvm/zulu8.70.0.23-ca-jdk8.0.372-linux_x64" >> $GITHUB_ENV
+        echo "$JAVA_HOME/bin" >> $GITHUB_PATH
+
+    # 3. 国内镜像加速安装Flutter
+    - name: Install Flutter
+      run: |
         wget https://mirrors.tuna.tsinghua.edu.cn/flutter/flutter_infra_release/releases/stable/linux/flutter_linux_${FLUTTER_VERSION}-stable.tar.xz
         tar -xf flutter_linux_${FLUTTER_VERSION}-stable.tar.xz
         echo "${GITHUB_WORKSPACE}/flutter/bin" >> $GITHUB_PATH
-        echo "FLUTTER_ROOT=${GITHUB_WORKSPACE}/flutter" >> $GITHUB_ENV
+        flutter config --no-analytics
+        flutter --version
 
-    # 3. Java环境配置（Zulu JDK 8）
-    - name: Set up Java
-      uses: actions/setup-java@v2.12.0
-      with:
-        java-version: ${{ env.JAVA_VERSION }}
-        distribution: 'zulu'
-
-    # 4. Android SDK配置
+    # 4. 安卓SDK配置
     - name: Setup Android
       run: |
+        mkdir -p ~/.android
+        touch ~/.android/repositories.cfg
         yes | sdkmanager --licenses
-        sdkmanager "platforms;android-${ANDROID_API_LEVEL}"
-        sdkmanager "build-tools;31.0.0"
-        sdkmanager "platform-tools"
+        sdkmanager "platform-tools" "platforms;android-31" "build-tools;31.0.0"
 
     # 5. 构建流程
     - name: Build APK
       run: |
-        flutter config --no-analytics
         flutter pub get
         flutter build apk --release -v
 
-    # 6. 结果上传（兼容旧版Runner）
+    # 6. 结果上传（使用旧版稳定上传工具）
     - name: Upload APK
-      uses: actions/upload-artifact@v2.4.1
+      uses: actions/upload-artifact@v2.3.1
       with:
         name: app-release
         path: build/app/outputs/flutter-apk/app-release.apk
